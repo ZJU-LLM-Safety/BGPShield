@@ -26,8 +26,7 @@ routing-anomaly-detection/
 │   ├── caida_as_org/
 │   ├── caida_as_rel/
 │   └── routeviews/
-├── pipeline.sh                  # One-command execution script
-└── llm.sh                       # Helper script
+└── pipeline.sh                  # One-command execution script
 ```
 
 ### Module 1: LLM-based Semantic Encoder (LSE)
