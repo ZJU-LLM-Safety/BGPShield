@@ -1,0 +1,60 @@
+*.swp
+*.vim
+
+data/routeviews/updates
+data/routeviews/ribs
+data/routeviews/cache
+data/routeviews/bgpd
+data/caida_as_rel/serial-1
+data/caida_as_rel/serial-2
+data/caida_as_org/cache
+data/caida_as_org/fetched_data
+data/bgpstream/cache
+data/bgpstream/event
+data/**/results
+
+**/__pycache__
+**/.DS_Store
+
+BGPShield/**/*.emb
+BGPShield/**/*.pt
+BGPShield/**/*.pth
+BGPShield/**/logs
+BGPShield/llMmodels/**/ases_knowledge_info_base_embd.emb
+BGPShield/llMmodels/**/*.png
+BGPShield/llMmodels/as_prompts_embs/**/*
+# !/BGPShield/models/*as-rel*/
+# !/BGPShield/models/**/llm_embs_float16/
+# !/BGPShield/models/**/llm_embs_float16/as_base_embd_*
+BGPShield/test*
+BGPShield/**/checkpoint
+BGPShield/as_info/process.py
+# BGPShield/as_info/20211101/as_brief_descriptions.pkl
+BGPShield/as_info/**/*.pkl
+!BGPShield/llMmodels/**/as_base_embd_*
+!BGPShield/test.ipynb
+
+llmEmbedding/test*
+
+routing_monitor/detection_result
+routing_monitor/__route_cache__
+# routing_monitor/detection_result/wide/*BEAM_metric
+# routing_monitor/detection_result/wide/*reported_alarms
+
+post_processor/rpki_cache
+post_processor/rpki_snapshots
+/post_processor/html/*
+!/post_processor/html/template_routeviews.html
+post_processor/summary_output/**/*
+!post_processor/summary_output/analysis.ipynb
+post_processor/test*
+
+**/*.log 
+**/*.out
+**/*.png
+**/*.pdf
+**/*.txt
+**/*.json
+**/*.csv
+**/*.bz2
+**/*.pkl
