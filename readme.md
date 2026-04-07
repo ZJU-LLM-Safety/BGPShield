@@ -4,14 +4,16 @@ BGPShield consists of two core modules operating in a sequential pipeline:
 
 ### Overview
 
+![BGPShield system pipeline](figs/system.png)
+
 ```
 routing-anomaly-detection/
-├── BGPShield/                   # LLM-based Semantic Encoder
-│   ├── iterative_as_embeds.py   # AS embedding generation
-│   ├── train.py                 # CDR network training
-│   └── CDR.py                   # Lightweight dimensionality reduction model
+├── BGPShield/                   # Adaptive LLM BGP Encoder
+│   ├── iterative_as_embeds.py   # embed AS profiels
+│   ├── train.py                 # train the Adapter
+│   └── Adapter.py               # Lightweight Adapter
 ├── anomaly_detector/            # BGP Anomaly Detector
-│   ├── diff_evaluator_routeviews.py    # AR-DTW path difference
+│   ├── diff_evaluator_routeviews.py    # SAM-ED path difference
 │   ├── llm_report_anomaly_routeviews.py # Anomaly detection
 │   └── utils.py                 # Utility functions
 ├── routing_monitor/             # Route monitoring
@@ -28,75 +30,6 @@ routing-anomaly-detection/
 │   └── routeviews/
 └── pipeline.sh                  # One-command execution script
 ```
-
-### Module 1: LLM-based Semantic Encoder (LSE)
-
-**Purpose**: Generate semantic embeddings that capture AS behavioral semantics and routing policy rationales.
-
-#### 1.1 AS Description Construction
-
-Formulates structured natural language descriptions for each AS by integrating:
-
-- **Stable Attributes**: Organization, country, connectivity degree (providers/peers/customers), customer cone size, prefix counts
-- **Business Neighbors**: Enumeration of adjacent ASes with relationship labels and their connectivity statistics
-
-**Key Files**:
-- `routing_monitor/llmmonitor.py`: Constructs AS descriptions with segment-wise neighbor information
-- Related data sources: CAIDA AS Relationship, AS Organization, ASRank datasets (in `data/` directory)
-
-#### 1.2 Segment-wise Embedding Generation
-
-Transforms AS descriptions into LLM embeddings using a segment-wise aggregation scheme:
-
-**Key Files**:
-- `BGPShield/iterative_as_embeds.py`: Generates embeddings with iterative neighbor batching
-- Supports multiple LLM models (modify `model_path` in the script)
-
-#### 1.3 Contrastive Dimensionality Reduction (CDR)
-
-Compresses high-dimensional LLM embeddings into compact semantic space:
-
-**Key Files**:
-- `BGPShield/train.py`: Trains the dimensionality reduction network
-- `BGPShield/CDR.py`: Neural network architecture for reduction
-
-### Module 2: BGP Anomaly Detector (BAD)
-
-**Purpose**: Identify anomalous BGP route changes through semantic path analysis.
-
-#### 2.1 Route Change Detection
-
-Monitors BGP updates and identifies route changes:
-
-**Key Files**:
-- `routing_monitor/all_route_monitor.py`: Collect route changes from 40+ vantage points
-- `routing_monitor/llmmonitor.py`: Additional monitoring utilities
-
-#### 2.2 Path Difference Scoring (AR-DTW Algorithm)
-
-Computes semantic distance between AS paths using AR-DTW:
-
-**Key Files**:
-- `anomaly_detector/diff_evaluator_routeviews.py`: Implements AR-DTW algorithm for path difference computation
-- `anomaly_detector/utils.py`: Utility functions including threshold computation
-
-#### 2.3 Anomalous Change Detection
-
-Applies adaptive thresholding to identify anomalies:
-
-**Key Files**:
-- `anomaly_detector/llm_report_anomaly_routeviews.py`: Anomaly detection and reporting
-
-#### 2.4 Multi-View Event Aggregation
-
-Consolidates anomalous route changes into distinct events:
-
-**Key Files**:
-- `post_processor/alarm_postprocess_routeviews.py`: Post-processes alarms and identifies anomaly properties
-- `post_processor/rpki_validation_request.py`: RPKI validation checking
-- `post_processor/summary_routeviews.py`: Generates final reports
----
-
 
 ## Quick Start with pipeline.sh
 
@@ -136,9 +69,9 @@ The `pipeline.sh` script automates the entire BGPShield workflow, from data coll
   - Use `nvidia-smi` to check available GPUs
   - Example: `--device 0` (uses GPU 0)
 
-- **`--reduce`**: Enable/disable dimensionality reduction
-  - `True`: Apply CDR to compress embeddings (recommended)
-  - `False`: Use raw LLM embeddings
+- **`--reduce`**: Enable/disable Adapter in ALBE
+  - `True`: Apply Adapter to align and compress embeddings to BGP Space (dimension: 16) (recommended)
+  - `False`: Use raw LLM BGP embeddings
 
 - **`--type`**: BGP data source type
   - `updates`: Use UPDATE files (for recent events, post-2015)
@@ -165,29 +98,26 @@ The `pipeline.sh` script automates the entire BGPShield workflow, from data coll
 
 The `pipeline.sh` script executes the following stages sequentially:
 
-### Stage 1: AS Embedding Generation (LSE Module)
+### Stage 1: AS Embedding Generation (ALBE Module)
 - Downloads CAIDA AS relationship data
-- Constructs AS descriptions
-- Generates LLM embeddings with segment-wise aggregation
+- Constructs AS profiles
+- Train ALBE with a contrastive loss 
+- Generate adaptive LLM BGP embeddings (dimension: 16)
 
-### Stage 2: Dimensionality Reduction (if `--reduce True`)
-- Trains CDR network on LLM embeddings
-- Compresses embeddings to optimal dimension (default: 16)
-
-### Stage 3: Route Change Detection (BAD Module)
+### Stage 2: Route Change Detection (BAD Module)
 - Downloads RouteViews data (RIBs + UPDATEs)
 - Identifies route changes in ±12h window
 
-### Stage 4: Path Difference Computation
+### Stage 3: Path Difference Computation
 - Applies AR-DTW algorithm to compute semantic distances
 - Generates path difference scores
 
-### Stage 5: Anomaly Detection & Aggregation
+### Stage 4: Anomaly Detection & Aggregation
 - Applies adaptive thresholding
 - Aggregates anomalies into events
 - Attributes responsible ASes
 
-### Stage 6: Report Generation
+### Stage 5: Report Generation
 - Validates RPKI status
 - Identifies anomaly properties
 - Generates HTML/JSON/CSV reports

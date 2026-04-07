@@ -15,8 +15,8 @@ def find_free_gpus():
     free_gpus = []
     for i in range(torch.cuda.device_count()):
         device = torch.cuda.get_device_properties(i)
-        memory_allocated = torch.cuda.memory_allocated(i)  # 当前使用的显存
-        memory_reserved = torch.cuda.memory_reserved(i)   # 当前保留的显存
+        memory_allocated = torch.cuda.memory_allocated(i)  
+        memory_reserved = torch.cuda.memory_reserved(i)   
         if memory_allocated == 0 and memory_reserved == 0:
             free_gpus.append(i)
     return free_gpus
@@ -38,10 +38,10 @@ import scipy.stats as stats
 
 def approx_knee_point(x):
     x, y = np.unique(x, return_counts=True) 
-    _x = (x-x.min())/(x.max()-x.min())  # 标准化 x
-    _y = y.cumsum()/y.sum()            # y 的累积分布
-    idx = np.argmax(np.abs(_y-_x))      # 找到 y 和 x 的差值最大的位置
-    return x[idx], _y[idx]  # 返回膝点和累积分布
+    _x = (x-x.min())/(x.max()-x.min())  
+    _y = y.cumsum()/y.sum()            
+    idx = np.argmax(np.abs(_y-_x))      
+    return x[idx], _y[idx]  
 
 def approx_knee_point_continuous(x):
     x = np.array(x)
@@ -60,186 +60,6 @@ def approx_knee_point_continuous(x):
     cdf_knee = cdf_smooth[idx_knee]
 
     return x_knee, cdf_knee
-
-def load_emb_distance(train_dir, return_emb=False):
-    train_dir = Path(train_dir)
-
-    node_emb_path = train_dir / "node.emb"
-    # node_emb_path = train_dir / "ases_knowledge_info_base_embd.emb"   # TODO
-    link_emb_path = train_dir / "link.emb"
-    rela_emb_path = train_dir / "rela.emb"
-    print(f"Load Model from: {train_dir}")
-
-    node_emb = pickle.load(open(node_emb_path, "rb"))
-    link_emb = pickle.load(open(link_emb_path, "rb"))
-    rela_emb = pickle.load(open(rela_emb_path, "rb"))
-    rela = rela_emb["p2c"]  
-    link = link_emb["p2c"]  
-    link = softmax(link)    # softmax 归一化
-
-    @lru_cache(maxsize=100000)
-    def _max_emb_distance(a, b): 
-        a_list = [as_name.strip() for as_name in a.strip("{}").split(",") if as_name.strip()]
-        b_list = [as_name.strip() for as_name in b.strip("{}").split(",") if as_name.strip()]
-        max_distance, max_a, max_b = -np.inf, None, None
-        found_valid = False
-        for as_a in a_list:
-            as_a = as_a.strip()
-            for as_b in b_list:
-                as_b = as_b.strip()
-                if as_a == as_b:
-                    distance = 0.
-                elif as_a in node_emb and as_b in node_emb:
-                    xi, xj = node_emb[as_a], node_emb[as_b]
-                    distance = np.sum((xj - xi)**2 * link) + np.abs(np.sum((xj - xi) * rela))
-                else:
-                    distance = np.inf
-                found_valid = True
-                if distance > max_distance:
-                    max_distance = distance
-                    max_a, max_b = as_a, as_b
-        if not found_valid:
-            return np.inf, None, None
-        return max_distance, max_a, max_b
-
-    @lru_cache(maxsize=100000)
-    def _emb_distance(a, b): 
-        """
-        计算两个节点之间的嵌入距离，返回 (距离, 节点a, 节点b)
-        """
-        a = a.strip("{}").split(",")[0]
-        b = b.strip("{}").split(",")[0]
-
-        if a == b: return 0., a, b
-        if a not in node_emb or b not in node_emb:
-            return np.inf, a, b
-        
-        xi = node_emb[a]
-        xj = node_emb[b]
-
-        return np.sum((xj - xi)**2 * link) + np.abs(np.sum((xj - xi) * rela)), a, b
-
-    def emb_distance(a, b):
-        return _max_emb_distance(str(a), str(b))  # 保留三元组结构
-
-    @lru_cache(maxsize=100000)
-    def _dtw_distance(s, t):
-        """
-        计算两条路径（s 和 t）的动态时间规整（DTW）距离
-        """
-        # 去除连续重复的 ASN
-        s = [v for i,v in enumerate(s) if i == 0 or v != s[i-1]]
-        t = [v for i,v in enumerate(t) if i == 0 or v != t[i-1]]
-        ls, lt = len(s), len(t)
-        """
-        e.g.:
-            s: ['2500', '17676', '2914', '12956', '19551']
-            t: ['2500', '2914', '12956', '19551']
-        """
-        
-        # 初始化 DTW 矩阵
-        DTW = np.full((ls+1, lt+1), np.inf)
-        DTW[0,0] = 0.
-
-        # 计算 DTW 矩阵
-        for i in range(ls):
-            for j in range(lt):
-                cost = emb_distance(s[i], t[j]) # 计算嵌入距离
-                DTW[i+1, j+1] = cost + min(DTW[i  , j+1],
-                                           DTW[i+1, j  ],
-                                           DTW[i  , j  ])
-        return DTW[ls, lt]
-
-    # def dtw_distance(s, t):
-    #     return _dtw_distance(tuple(s), tuple(t))
-
-    @lru_cache(maxsize=100000)
-    def _min_dtw_distance(s, t):
-        s_orig, t_orig = list(s), list(t)
-        s_clean = [v for i, v in enumerate(s_orig) if i == 0 or v != s_orig[i-1]]
-        t_clean = [v for i, v in enumerate(t_orig) if i == 0 or v != t_orig[i-1]]
-        n, m = len(s_clean), len(t_clean)
-        DTW = [[(np.inf, [], []) for _ in range(m+1)] for _ in range(n+1)]
-        DTW[0][0] = (0.0, [], [])
-        for i in range(n):
-            for j in range(m):
-                cost, rep_s, rep_t = emb_distance(s_clean[i], t_clean[j])
-                candidates = [DTW[i][j], DTW[i][j+1], DTW[i+1][j]]
-                best = min(candidates, key=lambda x: x[0])
-                new_cost = cost + best[0]
-                DTW[i+1][j+1] = (
-                    new_cost, 
-                    best[1] + [(i, rep_s)], 
-                    best[2] + [(j, rep_t)]
-                )
-        final_cost, aligned_s, aligned_t = DTW[n][m]
-
-        def build_orig_to_clean_map(orig):
-            """
-            对应 s_orig → s_clean 的索引映射：
-            返回一个 list，长度 = len(orig)，
-            对于 orig 的每个位置 i，告诉你它属于哪一个 clean_idx。
-            """
-            orig_to_clean = [None] * len(orig)
-            clean_idx = -1
-            last = None
-            for i, token in enumerate(orig):
-                if i == 0 or token != last:
-                    clean_idx += 1
-                orig_to_clean[i] = clean_idx
-                last = token
-            return orig_to_clean
-
-        original_to_clean_s = build_orig_to_clean_map(s_orig)
-        original_to_clean_t = build_orig_to_clean_map(t_orig)
-
-        for item in aligned_s:
-            s_clean[item[0]] = item[1]
-        for item in aligned_t:
-            t_clean[item[0]] = item[1]
-
-        aligned_s_str, aligned_t_str = s_orig.copy(), t_orig.copy()
-        for index, pos in enumerate(original_to_clean_s):
-            aligned_s_str[index] = s_clean[pos]
-        for index, pos in enumerate(original_to_clean_t):
-            aligned_t_str[index] = t_clean[pos]
-
-        for i in range(len(aligned_s_str)):
-            if aligned_s_str[i] not in s_orig[i]:
-                print(f"Origin Not Match: \n\taligned_s: {aligned_s} \n\trestored_s: {aligned_s_str} \n\toriginal_s: {s_orig}")
-
-        for i in range(len(aligned_t_str)):
-            if aligned_t_str[i] not in t_orig[i]:
-                print(f"Origin Not Match: \n\taligned_t: {aligned_t} \n\trestored_t: {aligned_t_str} \n\toriginal_t: {t_orig}")
-
-        aligned_s_str = " ".join(aligned_s_str)
-        aligned_t_str = " ".join(aligned_t_str)
-        return final_cost
-
-    def dtw_distance(s, t):
-        return _min_dtw_distance(tuple(s), tuple(t))
-
-
-    @lru_cache(maxsize=100000)
-    def _path_emb_length(s):
-        """
-        计算路径 s 的嵌入长度。
-        """
-        # 计算相邻节点的嵌入距离
-        d = np.array([emb_distance(a,b)[0] for a,b in zip(s[:-1], s[1:])])
-        # 去除无穷大和负数的距离
-        d = d[(d > 0) & (d < np.inf)]
-        # 返回嵌入长度
-        return np.nan if d.size == 0 else d.sum()
-
-    def path_emb_length(s):
-        return _path_emb_length(tuple(s))
-
-    if return_emb:
-        return emb_distance, dtw_distance, path_emb_length, node_emb, link, rela
-
-    return emb_distance, dtw_distance, path_emb_length
-
 
 def load_embs_distance_optim(emb_dir_1, bge=False, return_emb=False):
     emb_dir_1 = Path(emb_dir_1)
@@ -265,11 +85,9 @@ def load_embs_distance_optim(emb_dir_1, bge=False, return_emb=False):
                 elif as_a in node1_emb and as_b in node1_emb:
                     xi, xj = node1_emb[as_a], node1_emb[as_b]
                     if bge:
-                        # distance = 1 - xi @ xj.T
                         distance = -np.log(xi @ xj.T + 1e-6)
                     else:
                         distance = np.linalg.norm(xi - xj)
-                        # dot = float(np.dot(xi, xj))
                 else:
                     distance = np.inf
                 found_valid = True
@@ -305,11 +123,6 @@ def load_embs_distance_optim(emb_dir_1, bge=False, return_emb=False):
         final_cost, aligned_s, aligned_t = DTW[n][m]
 
         def build_orig_to_clean_map(orig):
-            """
-            对应 s_orig → s_clean 的索引映射：
-            返回一个 list，长度 = len(orig)，
-            对于 orig 的每个位置 i，告诉你它属于哪一个 clean_idx。
-            """
             orig_to_clean = [None] * len(orig)
             clean_idx = -1
             last = None

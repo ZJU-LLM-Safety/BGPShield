@@ -55,7 +55,6 @@ def get_ribs_in_range(collector, collectors2url, start_dt, end_dt):
             archive_list = []
     else:
         res = subprocess.check_output(["curl", "-s", target_url]).decode()
-        # 匹配类似 rib.20230815.1234.bz2 或 .csv 文件
         archive_list = re.findall(r'\<a href="(.+?(\d{8}).??(\d{4}).*?\.bz2)"\>', res)
         json.dump(archive_list, open(cache_path, "w"), indent=2)
     

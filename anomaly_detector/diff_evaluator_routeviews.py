@@ -43,7 +43,6 @@ def evaluate_monthly_for(collector, year, month, day, hour, minute, model, dimen
     else:
         target_date = f"{year}{month:02d}"
     
-    # 输入数据
     # route_change_dir = collector_result_dir / f"route_change"
     route_change_dir = collector_result_dir / f"route_change_{target_date}"
 
@@ -85,14 +84,11 @@ def evaluate_monthly_for(collector, year, month, day, hour, minute, model, dimen
         try:
             df = pd.read_csv(i, quotechar='"')
         except EmptyDataError:
-            # 如果原始 CSV 文件为空，跳过
             continue
         except Exception as e:
-            # 捕获其他读取错误，建议至少打印警告
             print(f"Error reading {i}: {e}")
             continue
         
-        # 从 csv 文件中提取路径
         path1 = [s.split(" ") for s in df["path1"].values]
         path2 = [t.split(" ") for t in df["path2"].values]
 
@@ -103,7 +99,6 @@ def evaluate_monthly_for(collector, year, month, day, hour, minute, model, dimen
         processed_path2 = [d[2] for d in diff]
 
         metrics = pd.DataFrame.from_dict({
-            # 添加标识
             "timestamp": df["timestamp"],
             "vantage_point": df["vantage_point"],
             "forwarder": df["forwarder"],
@@ -111,17 +106,16 @@ def evaluate_monthly_for(collector, year, month, day, hour, minute, model, dimen
             "prefix2": df["prefix2"],
             "path1": df["path1"],
             "path2": df["path2"],
-            # 计算数据
             "diff": [d[0] for d in diff],    # [dtw_d(s,t) for s,t in zip(path1, path2)],  
             "diff_path_1": processed_path1,    
             "diff_path_2": processed_path2,    
             "diff_only_exist": [d[0] for d in diff_only_exist], #[dtw_d_only_exist(s,t) for s,t in zip(path1, path2)],    
             "diff_only_exist_path_1": [d[1] for d in diff_only_exist],
             "diff_only_exist_path_2": [d[2] for d in diff_only_exist],
-            "path_d1": [path_d(i) for i in processed_path1], # [path_d(i) for i in path1],  # 计算路径的嵌入长度
-            "path_d2": [path_d(i) for i in processed_path2], # [path_d(i) for i in path2],  # 计算路径的嵌入长度
-            "path_l1": [len(i) for i in processed_path1], # [len(i) for i in path1],     # 路径的长度
-            "path_l2": [len(i) for i in processed_path2] ,# [len(i) for i in path2],     # 路径的长度
+            "path_d1": [path_d(i) for i in processed_path1], # [path_d(i) for i in path1],  
+            "path_d2": [path_d(i) for i in processed_path2], # [path_d(i) for i in path2],  
+            "path_l1": [len(i) for i in processed_path1], # [len(i) for i in path1],     
+            "path_l2": [len(i) for i in processed_path2] ,# [len(i) for i in path2],     
             "head_tail_d1": [emb_d(i[0], i[-1])[0] for i in processed_path1] , # [emb_d(i[0], i[-1]) for i in path1],    
             "head_tail_d2": [emb_d(i[0], i[-1])[0] for i in processed_path2] ,# [emb_d(i[0], i[-1]) for i in path2],   
             "aligned_count": [d[3] for d in diff] ,

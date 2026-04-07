@@ -197,10 +197,6 @@ def path_superset(path1, path2):
 @click.option("--model", "-M", type=int, default=0, help="id of LLM Model")
 @click.option("--dimension", "-d", type=int, default=0, help="Whether to use dimensionality reduction, 0 for NonReduce, Positive Number for dimension of reduction")
 def postprocess(collector, year, month, day, hour, minute, model, dimension):
-    """
-    collector, route_change_dir, beam_metric_dir, reported_alarm_dir 为输入数据目录
-    同时 reported_alarm_dir 也为输出数据目录，但保存为其下 flag 文件夹
-    """
     model_list = [
         "/hub/huggingface/models/deepseek-ai/DeepSeek-R1-0528-Qwen3-8B/", 
         "/hub/huggingface/models/Qwen/Qwen3-1.7B-Base/", 

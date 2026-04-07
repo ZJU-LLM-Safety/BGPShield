@@ -46,10 +46,6 @@ while [[ $# -gt 0 ]]; do
       MINUTE="$2"
       shift 2
       ;;
-    # --collector)
-    #   COLLECTOR="$2"
-    #   shift 2
-    #   ;;
     --range)
       RANGE="$2"
       shift 2
@@ -62,10 +58,6 @@ while [[ $# -gt 0 ]]; do
       SERIAL="$2"
       shift 2
       ;;
-    # --llm)
-    #   LLM="$2"
-    #   shift 2
-    #   ;;
     --dim)
       DIM="$2"
       shift 2
@@ -104,15 +96,16 @@ if [[ "$MODEL" < 0 || "$MODEL" > 3 ]]; then
 fi
 
 DATE_STR="${YEAR}${MONTH}${DAY}"
+YM_FIRST="${YEAR}${MONTH}01"
 
 if [[ -z "$SERIAL" ]]; then
   if [ "$DATE_STR" -lt "20151201" ]; then
     echo -e "\e[33m[INFO] date < 20151201, using serial 1\e[0m"
     SERIAL=1
-    BEAM_MODEL="${YEAR}${MONTH}01.as-rel.1000.10.128"
+    BEAM_MODEL="${YM_FIRST}.as-rel.1000.10.128"
   else
     SERIAL=2
-    BEAM_MODEL="${YEAR}${MONTH}01.as-rel${SERIAL}.1000.10.128"
+    BEAM_MODEL="${YM_FIRST}.as-rel${SERIAL}.1000.10.128"
   fi
 fi
 
@@ -152,12 +145,20 @@ PY_ARGS_COMMON=()
 
 start_time=$(date +%s.%N)
 
-echo -e "\e[32mStep 0: Constructing LLM embedding\e[0m"
+echo -e "\e[32mStep 0: Constructing Adaptive LLM embedding\e[0m"
 python3 BGPShield/iterative_as_embeds.py \
     --year "$YEAR" \
     --month "$MONTH" \
     --device "$DEVICE" \
     --model "$MODEL" 
+
+python3 BGPShield/train.py \
+    --time "$YM_FIRST"
+    --dimension "$DIM"
+    --model "$MODEL" 
+    --epoches "$EPOCHES"
+    --device "$DEVICE"
+
 
 end_time=$(date +%s.%N)
 elapsed=$(echo "$end_time - $start_time" | bc)

@@ -69,11 +69,6 @@ def main(collector, year, month, day, hour, minute, model, llm, dimension):
 
     result_dir = Path(__file__).resolve().parent
 
-    # 如果csv, html, jsonl都已经生成过了，就直接返回
-    # csv_path = Path(summary_dir/f"Llm_alarms_after_post_process_{collector}_{year}{month:02}.csv")
-    # html_path = Path(html_dir/f"Llm_report_{collector}_{target_date}.html")
-    # jsonl_path = Path(summary_dir/f"Llm_alarms_{collector}_{year}{month:02}.jsonl")
-
     if llm:
         print("use llm model")
         summary_dir = summary_dir/model_name
@@ -104,7 +99,6 @@ def main(collector, year, month, day, hour, minute, model, llm, dimension):
         print(f"csv, html, jsonl summary report for {collector}_{target_date} already exist")
         return
     
-    # 为 html 生成目录
     html_dir = Path(html_path).parent
     html_dir.mkdir(parents=True, exist_ok=True)
 
@@ -132,7 +126,7 @@ def main(collector, year, month, day, hour, minute, model, llm, dimension):
             df = pd.read_csv(i["save_path"], quotechar='"')
             flags = pd.read_csv(flags_dir/f"{Path(i['save_path']).stem}.flags.csv", quotechar='"', low_memory=False)
             assert len(df) == len(flags), (
-                f"行数不一致：df({len(df)}) vs flags({len(flags)})"
+                f"row number mismatch: df({len(df)}) vs flags({len(flags)})"
             )
             df = pd.concat([df, flags], axis=1)
 
@@ -213,17 +207,6 @@ def main(collector, year, month, day, hour, minute, model, llm, dimension):
             df.loc[minor_anomaly, ["pattern"]] = "minor_anomaly"
 
             df = df.loc[minor_anomaly | anomaly | (~benign)] # post-filtering
-            # df = df.loc[(~exception_t3)|anomaly_t1|anomaly_t2|anomaly_t4]
-
-            # # 确保 diff_path_2 是字符串格式
-            # df["diff_path_2"] = df["diff_path_2"].astype(str)
-
-            # # test 200759 for 2016.4.22
-            # rows_with_200759 = df[df["diff_path_2"].str.contains(r"\b200759\b")]
-
-            # if not rows_with_200759.empty:
-            #     print(f"\n[INFO] In file: {i['save_path']}, found entries with AS 200759 in diff_path_2:")
-            #     print(rows_with_200759[["diff_path_2", "pattern"]])  # 可选添加更多字段
 
             event_key = i["event_key"]
             forwarder_th = i["forwarder_th"]
@@ -300,7 +283,6 @@ def main(collector, year, month, day, hour, minute, model, llm, dimension):
         tags = ["a1", "a2", "a3", "a4", "b1", "b2", "b3", "b4", "b5"]
 
 
-        # utc_tz = pytz.timezone('UTC')   # 世界统一时间
         timestamp = group["timestamp"].values
         fmt = "%a %d %b %Y, %I:%M%p"
         start_time = datetime.fromtimestamp(timestamp.min(), tz=timezone.utc).strftime(fmt)
@@ -451,7 +433,6 @@ def main(collector, year, month, day, hour, minute, model, llm, dimension):
             sections.append(html)
         template = open(result_dir/"html_template"/"template_routeviews.html", "r").read()
         html = template.replace("REPLACE_WITH_SECTIONS", "\n".join(sections))
-        # 修改HTML标题，添加 Realtime 标识
         html = html.replace("REPLACE_WITH_TITLE", f"{year}-{month} Realtime Report（RouteViews {collector}）")
         
 

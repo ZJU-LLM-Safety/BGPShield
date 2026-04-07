@@ -13,17 +13,7 @@ CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 import certifi
 def rpki_valid(prefix, asn):
-    # valid, unknown, invalid_asn, invalid_length, query error
     cache_path = CACHE_DIR/f"{prefix}.{asn}".replace("/", "-")
-    # if cache_path.exists():
-    #     try:
-    #         with open(cache_path, "r") as f:
-    #             r = json.load(f)
-    #         return r["data"]["status"]
-    #     except json.decoder.JSONDecodeError as e:
-    #         print(f"Error: cache_path: {cache_path}")
-    #         print(f"ReQuery")
-    #         cache_path.unlink()  # 删除损坏的缓存文件
 
     try:
         with open(cache_path, "r") as f:
@@ -34,9 +24,8 @@ def rpki_valid(prefix, asn):
         try:
             cache_path.unlink()
         except FileNotFoundError:
-            pass  # 已被其他线程删除，安全忽略
+            pass 
     except FileNotFoundError:
-        # 文件不存在，不需要删除
         pass
 
     payload = {"prefix": prefix, "resource": asn}
@@ -50,7 +39,6 @@ def rpki_valid(prefix, asn):
         if r.status_code == 200:
             # r = r.json()
             data = r.json()
-            # 检查关键字段存在再缓存
             if "data" in data and "status" in data["data"]:
                 with open(cache_path, "w") as f:
                     json.dump(data, f)
@@ -64,7 +52,7 @@ def rpki_valid(prefix, asn):
             print(f"RPKI query error: {prefix}, {asn}")
             return "query error"
     except ConnectionError as e:
-        time.sleep(1)  # 小延迟重试
+        time.sleep(1)  
         # print(f"\nHTTPS Connection error: {e}\nTrying HTTP Connection!!!")
         try:
             r = requests.get(back_url, params=payload)
@@ -73,7 +61,6 @@ def rpki_valid(prefix, asn):
                 # json.dump(r, open(cache_path, "w"))
                 # return r["data"]["status"]
                 data = r.json()
-                # 检查关键字段存在再缓存
                 if "data" in data and "status" in data["data"]:
                     with open(cache_path, "w") as f:
                         json.dump(data, f)

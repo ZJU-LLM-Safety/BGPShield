@@ -24,27 +24,17 @@ from data.caida_as_rel.fetch_data import get as prepare_edge_file
 primary_device = "cuda:0"
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
-# 构建 AS 邻接图与数据结构z
 class ASGraphBuilder:
-    """
-    读取 CAIDA as-rel 文件，构建以下数据结构：
-      - asn_list: 所有 AS 编号列表（字符串）
-      - asn2idx: AS编号到索引的映射
-      - upstreams: 每个 AS 的上游（提供商）集合（存储索引）
-      - downstreams: 每个 AS 的下游（客户）集合（存储索引）
-      - peers: 每个 AS 的对等集合（存储索引）
-      - G: 使用 networkx 构建的无向图（用于计算全局指标）
-    """
     def __init__(self, merged_as_info, merged_org_info, as_info_path='./'):
-        self.asn_list = []  # list of ASNs (自治系统的编号)
+        self.asn_list = []  # list of ASNs 
         self.asn2idx = {}   # mapping from ASN to index
         self.asn2org = {}   # mapping from ASN to org
         self.asn_info_list = {}  # list of AS info
-        self.upstreams = []   # AS 节点的上游节点
-        self.downstreams = []   # AS 节点的下游节点
+        self.upstreams = []   #  AS nodes upstream
+        self.downstreams = []   #
         self.peers = []
         self.G = nx.Graph()
-        self.as_info_path = as_info_path    # path to save as infoself.upstreams = [] # AS 节点的上游节点
+        self.as_info_path = as_info_path    # path to save as info
         self.get_org_id, self.get_org_name = self.build_org_helpers(merged_as_info, merged_org_info)
 
         if self.as_info_path is not None: 
@@ -67,9 +57,8 @@ class ASGraphBuilder:
         rel_list = []   # [(as1, as2, rel)]
         existing_rel_set = set()
 
-        # 读取所有合法关系（用于原始图和注入前的数据备份）
         rel_list = []  # [(as1, as2, rel)]
-        existing_rel_set = set()  # 用于快速查询是否存在关系
+        existing_rel_set = set()  
 
         for line in open(as_rel_file, "r"):
             if line[0] == "#":
@@ -77,9 +66,8 @@ class ASGraphBuilder:
             as1, as2, rel = line.strip().split("|")[:3]
             rel_list.append((as1, as2, rel))
             existing_rel_set.add((as1, as2))
-            existing_rel_set.add((as2, as1))  # 无向查重时用
+            existing_rel_set.add((as2, as1))  
 
-        # 噪声注入
         if noise > 0:
             num_to_modify = int((noise/100) * len(rel_list))
             print(f"[Noise Injection] Type: {noiseType}, Ratio: {noise/100}, Count: {num_to_modify}")
@@ -92,7 +80,6 @@ class ASGraphBuilder:
                         rel_list[idx] = (as1, as2, "-1")
                     elif rel == "-1":
                         rel_list[idx] = (as1, as2, "0")
-                    # 若其他值，则跳过
 
             elif noiseType == '1':  # Add non-existent relationship
                 added = 0
@@ -370,7 +357,6 @@ class ASGraphBuilder:
                         with open(pklFile, 'rb') as pklf:
                             as_info_list_tmp = pickle.load(pklf)
                     
-                    # 去除 as_info_list_tmp 中的空字典
                     as_info_list_tmp = [tmp for tmp in as_info_list_tmp if tmp.get('rank') is not None]
 
                     # Check the data in pkl file is valid (not None)
@@ -447,7 +433,6 @@ class ASGraphBuilder:
                             pklf.close()
                             print(f"Successfully saved {pklFile}")
             f.close()
-            # 重命名为 DONE_errorAS*.txt
             errorFileDone = os.path.join(self.as_info_path, f"DONE_{os.path.basename(file)}")
             os.rename(file, errorFileDone)
         # If dict error_as is not empty, retry the failed ASes
@@ -467,32 +452,21 @@ class ASGraphBuilder:
             if info:
                 return info["org_id"] if info["org_id"] != "" else info["opaque_id"]
                 # return info["opaque_id"] if info["opaque_id"] != "" else info["org_id"]
-            # AS 不在 merged_as_info 中时，org_id 用 ASN 自身
             return str(asn)
 
         def get_org_name(org_id):
-            # 先从 merged_org_info 取 name
             org_name = org_info.get(org_id, {}).get("name", "").strip()
             org_country = org_info.get(org_id, {}).get("country", "").strip()
-            # 如果没有有效 name，就用 Org_<org_id> 回退
             if not org_name:
                 org_name = f"Org_{org_id}"
             if not org_country:
-                # 如果没有有效 country，就用 unknown
                 org_country = "unknown"
-            # name = f"{org_name} (Country: {org_country})"
             return org_name, org_country
 
         return get_org_id, get_org_name
 
 
 def compute_global_metrics(G):
-    """
-    计算全局图指标：
-      - 度中心性（degree centrality）
-      - 局部聚类系数（clustering coefficient）
-      - PageRank
-    """
     print("Computing global degree centrality...")
     deg_centrality = nx.degree_centrality(G)
     print("Computing global clustering coefficients...")
@@ -506,13 +480,6 @@ def compute_global_metrics(G):
     }
 
 def build_as_full_description(asn, builder, global_metrics, asrank=False, batch_size=1000):
-    """
-    为目标AS构造描述信息，包括基本信息和所有邻居描述，区分不同关系类型。
-    返回 (as_info, neighbor_batches)
-      - as_info: 目标AS的基本信息描述
-      - neighbor_batches: 按批次拆分的邻居描述列表
-      - batch_size: 每批次邻居数量
-    """
     idx = builder.asn2idx.get(asn)
     org_country = builder.asn2org.get(asn, f"ASN_{asn} (Country: unknown)")
     if idx is None:
@@ -537,7 +504,6 @@ def build_as_full_description(asn, builder, global_metrics, asrank=False, batch_
             f"Peer Neighbors: {len(builder.peers[idx])}\n\n"
         )
         if info is not None:
-            # 下面这些字段名根据 AS Rank API 返回结构调整
             # as_name       = info.get("name", f"AS{asn}")
             country       = info.get("country", "unknown")
             org_id        = info.get("org_id", "N/A")
@@ -551,7 +517,6 @@ def build_as_full_description(asn, builder, global_metrics, asrank=False, batch_
                 # f"4. ASN Registration Date: {asn_created}\n\n"
 
 
-    # 收集邻居信息并区分关系
     neighbor_texts = []
     neighbor_len = len(builder.upstreams[idx]) + len(builder.downstreams[idx]) + len(builder.peers[idx])
     for n in (builder.upstreams[idx] | builder.downstreams[idx] | builder.peers[idx]):
@@ -574,7 +539,6 @@ def build_as_full_description(asn, builder, global_metrics, asrank=False, batch_
         neighbor_texts.append(neighbor_text)
 
     
-    # 分批次拆分
     neighbor_batches = [neighbor_texts[i:i+batch_size] for i in range(0, len(neighbor_texts), batch_size)]
 
     return as_info, neighbor_batches, neighbor_len
@@ -589,7 +553,6 @@ class ASInfoProcessor:
         if bge:
             self.model = BGEM3FlagModel(
                 model_path,  
-                # query_instruction_for_retrieval="Generate representations based on a subset of this AS's BGP business neighbors to distinguish routing roles and further apply them for anomaly detection (with neighbors provided in batches).",
                 use_fp16=True)
         else:
             quantization_config = BitsAndBytesConfig(
@@ -599,16 +562,7 @@ class ASInfoProcessor:
                 bnb_4bit_use_double_quant=True,
                 llm_int8_enable_fp32_cpu_offload=True,
             )
-            # if "Qwen" in model_path:
-            #     self.model = AutoModel.from_pretrained(
-            #         model_path,
-            #         device_map="auto",
-            #         low_cpu_mem_usage=True,
-            #         quantization_config=quantization_config,
-            #         pad_token_id=self.tokenizer.eos_token_id,
-            #         trust_remote_code=True
-            #     )
-            # else:
+
             self.model = AutoModelForCausalLM.from_pretrained(
                 model_path,
                 device_map="auto",
@@ -666,7 +620,6 @@ class ASInfoProcessor:
         for i in range(0, len(sentences), self.batch_size):
             batch = sentences[i:i+self.batch_size]
             with torch.no_grad():
-                # batch_emb = self.model.encode(batch)
                 batch_emb = self.model.encode(batch,
                                               max_length=8192,
                                               )['dense_vecs']
@@ -697,20 +650,11 @@ class ASInfoProcessor:
         return explanation
 
 def generate_batch_summary(prompt, processor):
-    """
-    通过 LLM 生成当前 prompt 的摘要，并返回摘要的嵌入向量。
-    """
     summary_text = processor.generate_role_explanation(prompt)
     summary_emb = processor.batchEmbed([summary_text])[0]
     return summary_text, summary_emb
 
 def iterative_embds_generation(asn, builder, processor, global_metrics, asrank=False, batch_size=50):
-    """
-    采用迭代式上下文扩充生成目标AS所有邻居的汇总摘要。
-    每轮将当前邻居批次加入上下文，并生成新的摘要。
-    返回最终摘要文本及其嵌入。
-    batch_size: 一个批次的邻居数量
-    """
     idx = builder.asn2idx.get(asn)
     if idx is None:
         return None, None
@@ -748,12 +692,6 @@ def iterative_embds_generation(asn, builder, processor, global_metrics, asrank=F
     return final_emb
 
 def bert_iterative_embds_generation(asn, builder, processor, global_metrics, asrank=False, batch_size=50):
-    """
-    采用迭代式上下文扩充生成目标AS所有邻居的汇总摘要。
-    每轮将当前邻居批次加入上下文，并生成新的摘要。
-    返回最终摘要文本及其嵌入。
-    batch_size: 一个批次的邻居数量
-    """
     idx = builder.asn2idx.get(asn)
     if idx is None:
         return None, None
@@ -763,23 +701,9 @@ def bert_iterative_embds_generation(asn, builder, processor, global_metrics, asr
     if neighbor_batches is None or len(neighbor_batches)==0:
         return base_info, emb
     
-    # print(f"\nBuilding description for AS {asn} DONE!!!")
-
-    # print(f"\nGenerating embeddings for AS {asn} neighbors...")
-
     final_emb = []
     tmp = neighbor_len
-    current_context = base_info
-    # for batch in tqdm(neighbor_batches, desc="Generating Neighbor Embeddings"):
     for batch in neighbor_batches:
-        # 这部分会显存不足，本来是为了衔接分批次传入 LLM 带来的影响（可能影响 LLM 全局解释）
-        # prompt = current_context + "\nNeighbors: " + ", ".join(batch)
-        # summary_text, summary_emb = generate_batch_summary(prompt, processor)
-        # final_emb.append(summary_emb.cpu().detach())
-        # current_context = summary_text
-        # del summary_text, summary_emb
-        # torch.cuda.synchronize()
-        # torch.cuda.empty_cache()
         batch_neighbor_len = len(batch)
         tmp = tmp - batch_neighbor_len
         prompt = base_info + \
@@ -822,19 +746,17 @@ def main(year, month, asrank, model, device, noise, noise_type):
     print(f"[INFO] Using GPUs: {gpu_list}")
     
     as_info_path = Path(__file__).resolve().parent/"as_info"/ \
-        f"{date_str}"/f"ases_knowledge_info_base" # 保存 AS 的信息,后续重新查询，可以直接在此基础上增添
-    # 构建AS图
+        f"{date_str}"/f"ases_knowledge_info_base" 
+
     builder = ASGraphBuilder(merged_as_info, merged_org_info, as_info_path)
     builder.read_caida_as_rel(as_rel_file, int(noise), noise_type)
 
     if not asrank:
-        # 计算全局指标
         print("Computing global graph metrics...")
         global_metrics = compute_global_metrics(builder.G)
         print("Global metrics computed.")
         builder.construct_as_org()
     else:
-        # 使用 AS Rank API 获取全局指标
         print("Using AS Rank API to Construct AS Description...")
         success = builder.construct_as_rank(batch_size=15)
         if not success:
@@ -861,19 +783,6 @@ def main(year, month, asrank, model, device, noise, noise_type):
     model_name = model_path.split("/")[-2]
     print(f"Model: {model_name}")
 
-    # # 初始化LLM处理器（Llama-3-8B）
-    # if bge:
-    #     model_path = "/hub/huggingface/models/BAAI/bge-m3/"     # 568M  No.20
-    #     # model_path = "/hub/huggingface/models/Alibaba-NLP/gte-Qwen2-7B-instruct" # 7B No.3
-    #     # model_path = "/hub/huggingface/models/Alibaba-NLP/gte-Qwen2-1.5B-instruct"   # 1.5B No.11
-    #     # 
-    # else:
-    #     # model_path = "/hub/huggingface/models/Qwen/Qwen3-1.7B-Base/" 
-    #     # model_path = "/hub/huggingface/models/deepseek-ai/DeepSeek-R1-Distill-Llama-8B/"
-    #     model_path = "/hub/huggingface/models/deepseek-ai/DeepSeek-R1-0528-Qwen3-8B/"
-
-    # LLM embedding 保存路径
-    # embds_dir = Path(__file__).resolve().parent/"llMmodels/newprompt/mean/iterative_as_info"
     embds_dir = Path(__file__).resolve().parent/"llMmodels/moreprompt/mean/iterative_as_info"
 
 
@@ -896,7 +805,6 @@ def main(year, month, asrank, model, device, noise, noise_type):
 
     processor = ASInfoProcessor(model_path, bge, batch_size=1, precision="float16", device=primary_device)
 
-    # 对每个AS生成最终embedding
     final_embeddings = {}
 
     if os.path.exists(mid_embds):
@@ -914,13 +822,11 @@ def main(year, month, asrank, model, device, noise, noise_type):
     pbar = tqdm(builder.asn_list, desc="AS Embedding Generation")
     for asn in pbar:
         pbar.set_description(f"Processing AS: {asn}")
-        # 如果已有中间结果，则跳过
         if asn in final_embeddings:
             continue
         
-        # 利用迭代式上下文扩充生成邻域摘要嵌入
         if bge:
-            neighbor_emb = bert_iterative_embds_generation(asn, builder, processor, global_metrics, asrank=asrank, batch_size=20)  # 此处 batch_size 为每批次邻居数量， BGE-M3
+            neighbor_emb = bert_iterative_embds_generation(asn, builder, processor, global_metrics, asrank=asrank, batch_size=20)  
         else:
             neighbor_emb = iterative_embds_generation(asn, builder, processor, global_metrics, asrank=asrank, batch_size=20)
 
@@ -928,14 +834,11 @@ def main(year, month, asrank, model, device, noise, noise_type):
             raise RuntimeError(f"Failed to generate embedding for AS {asn}")
         final_embeddings[asn] = neighbor_emb
         i += 1
-        # print(f"AS {asn} embedding generated.")
-        # 保存中间结果
         if i % 200 == 0:
             print(f"Saving mid embeddings till {i}")
             with open(mid_embds, "wb") as f:
                 pickle.dump(final_embeddings, f)
 
-    # 保存最终结果
     with open(embds_final, "wb") as f:
         pickle.dump(final_embeddings, f)
     print("All AS embeddings generated.")

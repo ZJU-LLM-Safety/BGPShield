@@ -10,6 +10,7 @@ os.environ['NUMEXPR_NUM_THREADS'] = '1'
 os.environ['OPENBLAS_NUM_THREADS'] = '1'    
 os.environ['NUMBA_NUM_THREADS'] = '1'       
 
+from re import T
 import threading
 
 threading.current_thread().name = 'MainThread'
@@ -18,7 +19,7 @@ import matplotlib
 matplotlib.use('Agg')   
 
 from pathlib import Path
-from CDR import BGPShield, force_cleanup
+from Adapter import BGPShield, force_cleanup
 from shutil import get_terminal_size
 import click
 import sys
@@ -77,11 +78,8 @@ def main(time, model, device, **model_params):
         train_dir = Path(embed_path) / "L2" / \
             f"{edge_file.stem}.{model_params['epoches']}.{model_params['Q']}.{model_params['dimension']}"
 
-        # train_dir = Path(__file__).resolve().parent/"models"/""/ \
-            # f"{edge_file.stem}.{model_params['epoches']}.{model_params['Q']}.{model_params['dimension']}"
         train_dir.mkdir(parents=True, exist_ok=True)
         print(f"train_dir: {train_dir}")
-        # os.makedirs(train_dir, exist_ok=True)
         
         model_params["train_dir"] = train_dir
         model_params["as_info_path"] = as_info_path

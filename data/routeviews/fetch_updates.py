@@ -114,7 +114,7 @@ def download_data(url, collector, data_type='updates', output_dir=None):
         outpath = SCRIPT_DIR / data_type / collector / fname
     else:
         outpath = Path(output_dir) / collector / fname
-    fpath = outpath.with_suffix("")  # 去掉 .bz2 后缀
+    fpath = outpath.with_suffix("") 
 
     if fpath.exists():
         print(f"{data_type} for {collector} {outpath.stem} already existed")
@@ -122,7 +122,6 @@ def download_data(url, collector, data_type='updates', output_dir=None):
 
     outpath.parent.mkdir(parents=True, exist_ok=True)
 
-    # 尝试 curl 下载（1 次）
     try:
         print(f"[{data_type}] Trying Wget to download {url}")
         subprocess.run(
@@ -130,7 +129,6 @@ def download_data(url, collector, data_type='updates', output_dir=None):
             check=True
         )
     except subprocess.CalledProcessError as e:
-        # 尝试 wget 下载（1 次）
         print(f"[{data_type}] Wget Failed, trying curl to download {url}")
         try:
             subprocess.run(
@@ -140,7 +138,6 @@ def download_data(url, collector, data_type='updates', output_dir=None):
         except subprocess.CalledProcessError as e2:
             raise RuntimeError(f"Both curl and wget failed to download {url}") from e2
 
-    # 解压
     try:
         subprocess.run(["bzip2", "-d", str(outpath)], check=True)
     except subprocess.CalledProcessError as e:

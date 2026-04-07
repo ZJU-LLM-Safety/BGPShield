@@ -132,7 +132,6 @@ def get_ribs_in_range(collector, collectors2url, start_dt, end_dt):
     else:
 
         res = subprocess.check_output(["curl", "-s", target_url]).decode()
-        # 匹配如 rib.20230815.1234.bz2
         archive_list = re.findall(r'<a href="(rib\.\d{8}\.\d{4}.*?\.bz2)"', res)
         archive_list = [(fname, ) for fname in archive_list]  
         with open(cache_path, "w") as f:
@@ -215,7 +214,7 @@ def download_data(url, collector, data_type='updates', output_dir=None):
         outpath = SCRIPT_DIR / data_type / collector / fname
     else:
         outpath = Path(output_dir) / collector / fname
-    fpath = outpath.with_suffix("")  # 去掉 .bz2 后缀
+    fpath = outpath.with_suffix("") 
 
     if fpath.exists():
         print(f"{data_type} for {collector} {outpath.stem} already existed")
@@ -240,7 +239,6 @@ def download_data(url, collector, data_type='updates', output_dir=None):
         except subprocess.CalledProcessError as e2:
             raise RuntimeError(f"Both curl and wget failed to download {url}") from e2
 
-    # 解压
     try:
         subprocess.run(["bzip2", "-d", str(outpath)], check=True)
     except subprocess.CalledProcessError as e:

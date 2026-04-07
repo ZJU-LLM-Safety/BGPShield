@@ -1,7 +1,5 @@
 from threadpoolctl import threadpool_limits
-# 限制 BLAS（包括 MKL）只用 1 线程
 threadpool_limits(limits=1, user_api='blas')
-# 限制 OpenMP 只用 1 线程
 threadpool_limits(limits=1, user_api='openmp')
 
 import torch
@@ -62,9 +60,9 @@ def worker_init_fn(worker_id):
 
 class Analyzer(Dataset):
     def __init__(self,
-                 embd_file,          # pickle: dict[asn->vector]
-                 merged_as_info,     # ASN->info 包含 org_id/opaque_id
-                 merged_org_info,    # org_id->name
+                 embd_file,          
+                 merged_as_info,     
+                 merged_org_info,    
                  Q=10,
                  block_size=256,
                  sample_per_block=1000,
