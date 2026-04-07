@@ -16,7 +16,7 @@ data/**/results
 **/__pycache__
 **/.DS_Store
 
-!figs/*
+!figs/system.png
 
 BGPShield/**/*.emb
 BGPShield/**/*.pt
